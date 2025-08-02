@@ -14,7 +14,7 @@ def get_db_connection():
         connection = mysql.connector.connect(
             charset="utf8mb4",
             connection_timeout=timeout,
-            database="Attendance",
+            database="college_attendance",
             host=st.secrets["host"],
             password=st.secrets["password"],
             port=st.secrets["port"],
