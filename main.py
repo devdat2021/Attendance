@@ -121,56 +121,53 @@ elif page == "View Progress":
                 cursor.execute(query_stats, (course['course_id'],))
                 stats = cursor.fetchone()
                 
-                total_classes = stats['total_classes']
-                present_classes = stats['present_classes']
-
-                if total_classes > 0:
-                    attendance_percentage = (present_classes / total_classes) * 100
-                    st.write(f"Total Classes: {total_classes} | Classes Attended: {present_classes}")
-                    st.write(f"Attendance Percentage: **{attendance_percentage:.2f}%**")
-
-                    # Display the progress bar and status
-                    progress_value = attendance_percentage / 100
+                # Robustly check if stats are valid before proceeding
+                if stats and stats['total_classes'] is not None and stats['present_classes'] is not None:
                     
-                    if attendance_percentage >= 85:
-                        bar_color = "green"
-                    elif attendance_percentage >= 75:
-                        bar_color = "orange"
-                    else:
-                        bar_color = "red"
-                    
-                    st.progress(progress_value)
-                    
-                    if attendance_percentage < 75:
-                        st.error(f"**Action Required!** Attendance is below the 75% deadline.")
-                    elif attendance_percentage < 85:
-                        st.warning(f"**Warning!** Attendance is below the 85% safety net.")
-                    else:
-                        st.success(f"Excellent! Attendance is above the 85% safety net.")
+                    # Explicitly cast the database values to standard Python integers
+                    total_classes = int(stats['total_classes'])
+                    present_classes = int(stats['present_classes'])
 
-                    # --- New Calculation Logic ---
-                    # Calculate how many more classes are needed to reach 85%
-                    if attendance_percentage < 85:
-                        st.markdown("---")
-                        st.subheader("Attendance Recovery Plan")
+                    if total_classes > 0:
+                        attendance_percentage = (present_classes / total_classes) * 100
+                        st.write(f"Total Classes: {total_classes} | Classes Attended: {present_classes}")
+                        st.write(f"Attendance Percentage: **{attendance_percentage:.2f}%**")
+
+                        # Display the progress bar and status
+                        progress_value = float(attendance_percentage) / 100
                         
-                        # The formula is (present + x) / (total + x) = 0.85
-                        # where x is the number of classes we need to attend.
-                        # Solving for x:
-                        # present + x = 0.85 * (total + x)
-                        # present + x = 0.85*total + 0.85*x
-                        # x - 0.85*x = 0.85*total - present
-                        # 0.15*x = 0.85*total - present
-                        # x = (0.85*total - present) / 0.15
-                        
-                        required_present_classes = math.ceil((0.85 * total_classes - present_classes) / (1 - 0.85))
-                        
-                        # Check if a positive number of classes is even possible
-                        if required_present_classes > 0:
-                             st.info(f"You need to attend **{required_present_classes}** consecutive classes to bring your attendance above the 85% safety net.")
+                        if attendance_percentage >= 85:
+                            bar_color = "green"
+                        elif attendance_percentage >= 75:
+                            bar_color = "orange"
                         else:
-                             st.info("Your attendance is low, but you are not far from the target. The next class you attend will improve your percentage.")
+                            bar_color = "red"
+                        
+                        st.progress(progress_value)
+                        
+                        if attendance_percentage < 75:
+                            st.error(f"**Action Required!** Attendance is below the 75% deadline.")
+                        elif attendance_percentage < 85:
+                            st.warning(f"**Warning!** Attendance is below the 85% safety net.")
+                        else:
+                            st.success(f"Excellent! Attendance is above the 85% safety net.")
 
+                        # --- Calculation Logic for Recovery Plan ---
+                        if attendance_percentage < 85:
+                            st.markdown("---")
+                            st.subheader("Attendance Recovery Plan")
+                            
+                            try:
+                                required_present_classes = math.ceil((0.85 * total_classes - present_classes) / (1 - 0.85))
+                            except ZeroDivisionError:
+                                required_present_classes = 0
+
+                            if required_present_classes > 0:
+                                st.info(f"You need to attend **{required_present_classes}** consecutive classes to bring your attendance above the 85% safety net.")
+                            else:
+                                st.info("Your attendance is low, but you are not far from the target. The next class you attend will improve your percentage.")
+                    else:
+                        st.info("No attendance records for this course yet.")
                 else:
                     st.info("No attendance records for this course yet.")
             
