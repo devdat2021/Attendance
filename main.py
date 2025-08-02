@@ -11,7 +11,7 @@ def get_db_connection():
     """Establishes and returns a MySQL database connection."""
     timeout = 10
     try:
-        connection = sqlc.connect(
+        connection = mysql.connector.connect(
             charset="utf8mb4",
             connection_timeout=timeout,
             database="Attendance",
@@ -21,7 +21,7 @@ def get_db_connection():
             user=st.secrets["user"],
         )
         return connection
-    except sqlc.Error as e:
+    except mysql.connector.Error as e:
         st.error(f"Error connecting to MySQL: {e}")
         return None
 
