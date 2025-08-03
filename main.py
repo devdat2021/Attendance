@@ -121,7 +121,6 @@ elif page == "View Progress":
                 cursor.execute(query_stats, (course['course_id'],))
                 stats = cursor.fetchone()
                 
-                # Robustly check if stats are valid before proceeding
                 if stats and stats['total_classes'] is not None and stats['present_classes'] is not None:
                     
                     # Explicitly cast the database values to standard Python integers
@@ -137,35 +136,44 @@ elif page == "View Progress":
                         progress_value = float(attendance_percentage) / 100
                         
                         if attendance_percentage >= 85:
-                            bar_color = "green"
+                            st.progress(progress_value)
+                            st.success(f"Excellent! Attendance is above the 85% safety net.")
                         elif attendance_percentage >= 75:
-                            bar_color = "orange"
-                        else:
-                            bar_color = "red"
-                        
-                        st.progress(progress_value)
-                        
-                        if attendance_percentage < 75:
-                            st.error(f"**Action Required!** Attendance is below the 75% deadline.")
-                        elif attendance_percentage < 85:
+                            st.progress(progress_value)
                             st.warning(f"**Warning!** Attendance is below the 85% safety net.")
                         else:
-                            st.success(f"Excellent! Attendance is above the 85% safety net.")
+                            st.progress(progress_value)
+                            st.error(f"**Action Required!** Attendance is below the 75% deadline.")
+                        
+                        # --- Bunk Calculator Feature (always available in an expander) ---
+                        with st.expander("Bunk Calculator"):
+                            if total_classes >= 0:
+                                hypothetical_total_classes = total_classes + 1
+                                hypothetical_percentage = (present_classes / hypothetical_total_classes) * 100
+                                
+                                st.write(f"If you bunk one class, your attendance would be **{hypothetical_percentage:.2f}%**.")
+                                
+                                if hypothetical_percentage >= 85:
+                                    st.success("You can safely bunk this class without dropping below the 85% safety net.")
+                                elif hypothetical_percentage >= 75:
+                                    st.warning("Bunking this class will keep you above the 75% deadline, but you will drop further below the 85% safety net.")
+                                else:
+                                    st.error("Bunking this class will cause your attendance to drop below the critical 75% deadline. **Do not bunk!**")
 
-                        # --- Calculation Logic for Recovery Plan ---
+                        # --- Attendance Recovery Plan (only appears when needed) ---
                         if attendance_percentage < 85:
-                            st.markdown("---")
-                            st.subheader("Attendance Recovery Plan")
-                            
-                            try:
-                                required_present_classes = math.ceil((0.85 * total_classes - present_classes) / (1 - 0.85))
-                            except ZeroDivisionError:
-                                required_present_classes = 0
+                            with st.expander("Show Attendance Strategy"):
+                                st.subheader("Attendance Recovery Plan")
+                                
+                                try:
+                                    required_present_classes = math.ceil((0.85 * total_classes - present_classes) / (1 - 0.85))
+                                except ZeroDivisionError:
+                                    required_present_classes = 0
 
-                            if required_present_classes > 0:
-                                st.info(f"You need to attend **{required_present_classes}** consecutive classes to bring your attendance above the 85% safety net.")
-                            else:
-                                st.info("Your attendance is low, but you are not far from the target. The next class you attend will improve your percentage.")
+                                if required_present_classes > 0:
+                                    st.info(f"You need to attend **{required_present_classes}** consecutive classes to bring your attendance above the 85% safety net.")
+                                else:
+                                    st.info("Your attendance is low, but you are not far from the target. The next class you attend will improve your percentage.")
                     else:
                         st.info("No attendance records for this course yet.")
                 else:
