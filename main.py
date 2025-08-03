@@ -149,14 +149,25 @@ elif page == "View Progress":
                         with st.expander("Bunk Calculator"):
                             if total_classes >= 0:
                                 hypothetical_total_classes = total_classes + 1
-                                hypothetical_percentage = (present_classes / hypothetical_total_classes) * 100
+                                hypothetical_present_classes = present_classes
+                                
+                                hypothetical_percentage = (hypothetical_present_classes / hypothetical_total_classes) * 100
                                 
                                 st.write(f"If you bunk one class, your attendance would be **{hypothetical_percentage:.2f}%**.")
                                 
                                 if hypothetical_percentage >= 85:
                                     st.success("You can safely bunk this class without dropping below the 85% safety net.")
                                 elif hypothetical_percentage >= 75:
+                                    # --- New Calculation for Recovery after bunking ---
                                     st.warning("Bunking this class will keep you above the 75% deadline, but you will drop further below the 85% safety net.")
+                                    
+                                    try:
+                                        # Calculate how many classes are needed to get back to 85% after the bunk
+                                        required_recovery_classes = math.ceil((0.85 * hypothetical_total_classes - hypothetical_present_classes) / (1 - 0.85))
+                                        if required_recovery_classes > 0:
+                                            st.info(f"You would need to attend **{required_recovery_classes}** consecutive classes to get back above 85%.")
+                                    except ZeroDivisionError:
+                                        pass
                                 else:
                                     st.error("Bunking this class will cause your attendance to drop below the critical 75% deadline. **Do not bunk!**")
 
