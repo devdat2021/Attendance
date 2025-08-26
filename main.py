@@ -70,22 +70,38 @@ elif page == "Mark Attendance":
 
         if courses:
             course_options = {course['course_name']: course['course_id'] for course in courses}
-            selected_course_name = st.selectbox("Select a Course", list(course_options.keys()))
-            selected_course_id = course_options[selected_course_name]
+            
+            with st.form(key='attendance_form'):
+                selected_course_name = st.selectbox("Select a Course", list(course_options.keys()))
+                selected_course_id = course_options[selected_course_name]
 
-            class_date = st.date_input("Date", date.today())
-            attendance_status = st.radio("Attendance Status", ("present", "absent"))
+                class_date = st.date_input("Date", date.today())
+                
+                # Logic to suggest the next class session number
+                cursor = conn.cursor()
+                query = "SELECT MAX(class_session) FROM attendance WHERE course_id = %s AND class_date = %s"
+                cursor.execute(query, (selected_course_id, class_date))
+                last_session = cursor.fetchone()[0]
+                next_session = (last_session + 1) if last_session else 1
+                cursor.close()
 
-            if st.button("Submit Attendance"):
+                class_session = st.number_input("Class Session Number", min_value=1, step=1, value=next_session)
+                
+                attendance_status = st.radio("Attendance Status", ("present", "absent"))
+
+                submitted = st.form_submit_button("Submit Attendance")
+
+            if submitted:
                 cursor = conn.cursor()
                 try:
-                    query = "INSERT INTO attendance (course_id, class_date, status) VALUES (%s, %s, %s)"
-                    cursor.execute(query, (selected_course_id, class_date, attendance_status))
+                    query = "INSERT INTO attendance (course_id, class_date, class_session, status) VALUES (%s, %s, %s, %s)"
+                    cursor.execute(query, (selected_course_id, class_date, class_session, attendance_status))
                     conn.commit()
-                    st.success(f"Attendance for '{selected_course_name}' on {class_date} marked as '{attendance_status}'.")
+                    st.success(f"Attendance for '{selected_course_name}' on {class_date}, Session {class_session} marked as '{attendance_status}'.")
+                    st.experimental_rerun()
                 except mysql.connector.Error as err:
                     if err.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
-                        st.warning(f"Attendance for '{selected_course_name}' on {class_date} has already been recorded.")
+                        st.warning(f"Attendance for '{selected_course_name}' on {class_date}, Session {class_session} has already been recorded.")
                     else:
                         st.error(f"Error: {err}")
                     conn.rollback()
