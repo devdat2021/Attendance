@@ -31,7 +31,7 @@ st.markdown("---")
 st.warning("This site is specifically for the use of P Devdat.\nPlease do not tamper or add any data into the site")
 # --- Sidebar for Navigation ---
 st.sidebar.header("Navigation")
-page = st.sidebar.radio("Go to", ["Add Course", "Mark Attendance", "View Progress"])
+page = st.sidebar.radio("Go to", [ "Mark Attendance", "View Progress","Add Course",])
 st.sidebar.markdown("---")
 st.sidebar.info("Attendance Deadline: 75%\n\nSafety Net: 85%")
 
