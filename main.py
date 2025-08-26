@@ -77,7 +77,6 @@ elif page == "Mark Attendance":
 
                 class_date = st.date_input("Date", date.today())
                 
-                # Logic to suggest the next class session number
                 cursor = conn.cursor()
                 query = "SELECT MAX(class_session) FROM attendance WHERE course_id = %s AND class_date = %s"
                 cursor.execute(query, (selected_course_id, class_date))
@@ -98,7 +97,8 @@ elif page == "Mark Attendance":
                     cursor.execute(query, (selected_course_id, class_date, class_session, attendance_status))
                     conn.commit()
                     st.success(f"Attendance for '{selected_course_name}' on {class_date}, Session {class_session} marked as '{attendance_status}'.")
-                    st.experimental_rerun()
+                    
+                    st.rerun()
                 except mysql.connector.Error as err:
                     if err.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
                         st.warning(f"Attendance for '{selected_course_name}' on {class_date}, Session {class_session} has already been recorded.")
