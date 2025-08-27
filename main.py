@@ -211,3 +211,36 @@ elif page == "View Progress":
 
         else:
             st.warning("No courses found. Please add a course first to view progress.")
+
+        # --- Export to CSV feature ---
+        st.markdown("---")
+        st.subheader("Export Data")
+        
+        conn = get_db_connection()
+        if conn:
+            query = """
+            SELECT
+                a.attendance_id,
+                c.course_name AS Course,
+                a.class_date,
+                a.class_session,
+                a.status
+            FROM attendance AS a
+            JOIN courses AS c
+                ON a.course_id = c.course_id;
+            """
+            
+            df = pd.read_sql(query, conn)
+            
+            if not df.empty:
+                st.download_button(
+                    label="Download Attendance Data as CSV",
+                    data=df.to_csv(index=False).encode('utf-8'),
+                    file_name='attendance_data.csv',
+                    mime='text/csv'
+                )
+            else:
+                st.info("No data to export yet. Please add some attendance records.")
+            
+            conn.close()
+
