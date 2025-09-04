@@ -4,9 +4,6 @@ import pandas as pd
 from datetime import date
 import math
 
-# --- Database Connection ---
-# This function centralizes the database connection logic.
-# You can easily change the details here.
 def get_db_connection():
     """Establishes and returns a MySQL database connection."""
     timeout = 10
@@ -25,19 +22,153 @@ def get_db_connection():
         st.error(f"Error connecting to MySQL: {e}")
         return None
 
+#Day-wise function
+
+def daywise(conn):
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    with st.form(key='day_form'):
+        selected_day = st.selectbox("Select a Day", days)
+        class_date = st.date_input("Date", date.today())
+        
+        submitted = st.form_submit_button("Submit Attendance")
+    
+    if submitted:
+        
+        attendance_data = []
+
+        if selected_day == "Monday":
+            attendance_data = [
+                (26, class_date, 1, 'present'),
+                (27, class_date, 1, 'present'),
+                (28, class_date, 1, 'present'),
+                (33, class_date, 1, 'present'),
+                (33, class_date, 2, 'present')
+            ]
+        elif selected_day == "Tuesday":
+            attendance_data = [
+                (34, class_date, 1, 'present'),
+                (30, class_date, 1, 'present'),
+                (29, class_date, 1, 'present'),
+                (29, class_date, 2, 'present'),
+                (31, class_date, 1, 'present'),
+                (31, class_date, 2, 'present')
+            ]
+        elif selected_day == "Wednesday":
+            attendance_data = [
+                (34, class_date, 1, 'present'),
+                (28, class_date, 1, 'present'),
+                (27, class_date, 1, 'present'),
+                (26, class_date, 1, 'present'),
+                (30, class_date, 1, 'present'),
+                (30, class_date, 2, 'present')
+            ]
+        elif selected_day == "Thursday":
+            attendance_data = [
+                (27, class_date, 1, 'present'),
+                (34, class_date, 1, 'present'),
+                (28, class_date, 1, 'present'),
+                (26, class_date, 1, 'present')
+            ]
+        elif selected_day == "Friday":
+            attendance_data = [
+                (32, class_date, 1, 'present'),
+                (32, class_date, 2, 'present'),
+                (28, class_date, 1, 'present')
+            ]
+        
+        if attendance_data:
+            cursor = conn.cursor()
+            try:
+                
+                query = "INSERT INTO attendance (course_id, class_date, class_session, status) VALUES (%s, %s, %s, %s)"
+                cursor.executemany(query, attendance_data)
+                conn.commit()
+                st.success(f"Attendance for '{selected_day}' on {class_date} marked.")
+                st.rerun()
+            except mysql.connector.Error as err:
+                if err.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
+                    st.warning(f"Attendance for '{selected_day}' on {class_date} has already been recorded.")
+                else:
+                    st.error(f"Error: {err}")
+                conn.rollback()
+            finally:
+                cursor.close()
+        else:
+            st.info("No attendance data defined for this day.")
+
 # --- Main Streamlit App Layout ---
 st.title("College Attendance Tracker")
 st.markdown("---")
 st.warning("This site is specifically for the use of P Devdat.\nPlease do not tamper or add any data into the site")
+
+# The main radio button to switch between attendance types
+option = st.radio("Select an option:", ["Course-wise","Day-wise"])
+
 # --- Sidebar for Navigation ---
 st.sidebar.header("Navigation")
-page = st.sidebar.radio("Go to", [ "Mark Attendance", "View Progress","Add Course",])
+page = st.sidebar.radio("Go to", ["Mark Attendance", "View Progress", "Add Course"])
 st.sidebar.markdown("---")
 st.sidebar.info("Attendance Deadline: 75%\n\nSafety Net: 85%")
 
+if page == "Mark Attendance":
+    st.header("Mark Daily Attendance")
+    conn = get_db_connection()
+    if conn:
+        if option == "Day-wise":
+            daywise(conn)
+        elif option == "Course-wise":
+          
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT course_id, course_name FROM courses")
+            courses = cursor.fetchall()
+            cursor.close()
 
-# --- Function to Add New Courses ---
-if page == "Add Course":
+            if courses:
+                course_options = {course['course_name']: course['course_id'] for course in courses}
+                
+                with st.form(key='attendance_form'):
+                    selected_course_name = st.selectbox("Select a Course", list(course_options.keys()))
+                    selected_course_id = course_options[selected_course_name]
+                    class_date = st.date_input("Date", date.today())
+                    
+                    cursor = conn.cursor()
+                    query = "SELECT MAX(class_session) FROM attendance WHERE course_id = %s AND class_date = %s"
+                    cursor.execute(query, (selected_course_id, class_date))
+                    last_session = cursor.fetchone()[0]
+                    next_session = (last_session + 1) if last_session else 1
+                    cursor.close()
+
+                    class_session = st.number_input("Class Session Number", min_value=1, step=1, value=next_session)
+                    
+                    attendance_status = st.radio("Attendance Status", ("present", "absent"))
+                    submitted = st.form_submit_button("Submit Attendance")
+
+                if submitted:
+                    cursor = conn.cursor()
+                    try:
+                        query = "INSERT INTO attendance (course_id, class_date, class_session, status) VALUES (%s, %s, %s, %s)"
+                        cursor.execute(query, (selected_course_id, class_date, class_session, attendance_status))
+                        conn.commit()
+                        st.success(f"Attendance for '{selected_course_name}' on {class_date}, Session {class_session} marked as '{attendance_status}'.")
+                        st.rerun()
+                    except mysql.connector.Error as err:
+                        if err.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
+                            st.warning(f"Attendance for '{selected_course_name}' on {class_date}, Session {class_session} has already been recorded.")
+                        else:
+                            st.error(f"Error: {err}")
+                        conn.rollback()
+                    finally:
+                        cursor.close()
+                # conn.close()
+            else:
+                st.warning("No courses found. Please add a course first.")
+        
+        # We should close the connection for Course-wise here too.
+        if option == "Course-wise":
+            conn.close()
+
+# --- Other Pages ---
+elif page == "Add Course":
     st.header("Add New Course")
     conn = get_db_connection()
     if conn:
@@ -58,67 +189,11 @@ if page == "Add Course":
             else:
                 st.warning("Please enter a course name.")
 
-# --- Function to Mark Daily Attendance ---
-elif page == "Mark Attendance":
-    st.header("Mark Daily Attendance")
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT course_id, course_name FROM courses")
-        courses = cursor.fetchall()
-        cursor.close()
-
-        if courses:
-            course_options = {course['course_name']: course['course_id'] for course in courses}
-            
-            with st.form(key='attendance_form'):
-                selected_course_name = st.selectbox("Select a Course", list(course_options.keys()))
-                selected_course_id = course_options[selected_course_name]
-
-                class_date = st.date_input("Date", date.today())
-                
-                cursor = conn.cursor()
-                query = "SELECT MAX(class_session) FROM attendance WHERE course_id = %s AND class_date = %s"
-                cursor.execute(query, (selected_course_id, class_date))
-                last_session = cursor.fetchone()[0]
-                next_session = (last_session + 1) if last_session else 1
-                cursor.close()
-
-                class_session = st.number_input("Class Session Number", min_value=1, step=1, value=next_session)
-                
-                attendance_status = st.radio("Attendance Status", ("present", "absent"))
-
-                submitted = st.form_submit_button("Submit Attendance")
-
-            if submitted:
-                cursor = conn.cursor()
-                try:
-                    query = "INSERT INTO attendance (course_id, class_date, class_session, status) VALUES (%s, %s, %s, %s)"
-                    cursor.execute(query, (selected_course_id, class_date, class_session, attendance_status))
-                    conn.commit()
-                    st.success(f"Attendance for '{selected_course_name}' on {class_date}, Session {class_session} marked as '{attendance_status}'.")
-                    
-                    st.rerun()
-                except mysql.connector.Error as err:
-                    if err.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
-                        st.warning(f"Attendance for '{selected_course_name}' on {class_date}, Session {class_session} has already been recorded.")
-                    else:
-                        st.error(f"Error: {err}")
-                    conn.rollback()
-                finally:
-                    cursor.close()
-                    conn.close()
-        else:
-            st.warning("No courses found. Please add a course first.")
-
-# --- Function to View Progress ---
 elif page == "View Progress":
     st.header("Attendance Progress")
     conn = get_db_connection()
     if conn:
         cursor = conn.cursor(dictionary=True)
-        
-        # Get all courses
         cursor.execute("SELECT course_id, course_name FROM courses")
         courses = cursor.fetchall()
 
@@ -126,7 +201,6 @@ elif page == "View Progress":
             for course in courses:
                 st.subheader(course['course_name'])
 
-                # Get total classes and present classes for the course
                 query_stats = """
                     SELECT
                         COUNT(*) as total_classes,
@@ -139,7 +213,6 @@ elif page == "View Progress":
                 
                 if stats and stats['total_classes'] is not None and stats['present_classes'] is not None:
                     
-                    # Explicitly cast the database values to standard Python integers
                     total_classes = int(stats['total_classes'])
                     present_classes = int(stats['present_classes'])
 
@@ -148,7 +221,6 @@ elif page == "View Progress":
                         st.write(f"Total Classes: {total_classes} | Classes Attended: {present_classes}")
                         st.write(f"Attendance Percentage: **{attendance_percentage:.2f}%**")
 
-                        # Display the progress bar and status
                         progress_value = float(attendance_percentage) / 100
                         
                         if attendance_percentage >= 85:
@@ -161,7 +233,6 @@ elif page == "View Progress":
                             st.progress(progress_value)
                             st.error(f"**Action Required!** Attendance is below the 75% deadline.")
                         
-                        # --- Bunk Calculator Feature (always available in an expander) ---
                         with st.expander("Bunk Calculator"):
                             if total_classes >= 0:
                                 hypothetical_total_classes = total_classes + 1
@@ -174,11 +245,9 @@ elif page == "View Progress":
                                 if hypothetical_percentage >= 85:
                                     st.success("You can safely bunk this class without dropping below the 85% safety net.")
                                 elif hypothetical_percentage >= 75:
-                                    # --- New Calculation for Recovery after bunking ---
                                     st.warning("Bunking this class will keep you above the 75% deadline, but you will drop further below the 85% safety net.")
                                     
                                     try:
-                                        # Calculate how many classes are needed to get back to 85% after the bunk
                                         required_recovery_classes = math.ceil((0.85 * hypothetical_total_classes - hypothetical_present_classes) / (1 - 0.85))
                                         if required_recovery_classes > 0:
                                             st.info(f"You would need to attend **{required_recovery_classes}** consecutive classes to get back above 85%.")
@@ -187,7 +256,6 @@ elif page == "View Progress":
                                 else:
                                     st.error("Bunking this class will cause your attendance to drop below the critical 75% deadline. **Do not bunk!**")
 
-                        # --- Attendance Recovery Plan (only appears when needed) ---
                         if attendance_percentage < 85:
                             with st.expander("Show Attendance Strategy"):
                                 st.subheader("Attendance Recovery Plan")
@@ -212,7 +280,6 @@ elif page == "View Progress":
         else:
             st.warning("No courses found. Please add a course first to view progress.")
 
-        # --- Export to CSV feature ---
         st.markdown("---")
         st.subheader("Export Data")
         
@@ -226,7 +293,7 @@ elif page == "View Progress":
                 a.class_session,
                 a.status
             FROM attendance AS a
-            JOIN courses AS c
+            LEFT JOIN courses AS c
                 ON a.course_id = c.course_id;
             """
             
@@ -243,4 +310,3 @@ elif page == "View Progress":
                 st.info("No data to export yet. Please add some attendance records.")
             
             conn.close()
-
