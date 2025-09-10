@@ -21,6 +21,20 @@ def get_db_connection():
     except mysql.connector.Error as e:
         st.error(f"Error connecting to MySQL: {e}")
         return None
+# --- New Timetable Display Function ---
+def display_timetable():
+    st.header("Weekly Timetable")
+
+    timetable = {
+        'Monday': ['COD', 'DS', 'SPT', 'OOP Lab', 'OOP Lab'],
+        'Tuesday': ['OOP', 'IDS', 'ESC', 'ESC', 'USP Lab', 'USP Lab'],
+        'Wednesday': ['OOP', 'SPT', 'DS', 'COD', 'IDS', 'IDS'],
+        'Thursday': ['DS', 'OOP', 'SPT', 'COD'],
+        'Friday': ['DS Lab', 'DS Lab', 'SPT'],
+    }
+    
+    df = pd.DataFrame(timetable.items(), columns=['Day', 'Classes'])
+    st.dataframe(df.style.set_properties(**{'white-space': 'pre-wrap'}), use_container_width=True)
 
 #Day-wise function
 
@@ -166,6 +180,7 @@ if page == "Mark Attendance":
         # We should close the connection for Course-wise here too.
         if option == "Course-wise":
             conn.close()
+        display_timetable()
 
 # --- Other Pages ---
 elif page == "Add Course":
